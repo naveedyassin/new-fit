@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitMeeUp.com</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.12.0/cdn.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .page-transition {
+            transition: all 0.3s ease-out;
+        }
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .fade-enter-active {
+            opacity: 1;
+            transform: translateY(0px);
+        }
+        .hero-gradient {
+            background: linear-gradient(90deg, #4F46E5 0%, #7C3AED 100%);
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
+        }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans" x-data="mainData()" x-init="$watch('currentPage', () => initializeCharts())">
+    <script>
+        function mainData() {
+            return {
+                currentPage: 'home',
+                mobileMenuOpen: false,
+                bmiData: {
+                    height: 170,
+                    weight: 70,
+                    age: 30,
+                    gender: 'male',
+                    activityLevel: 'moderate'
+                },
+                contactForm: {
+                    name: '',
+                    email: '',
+                    message: '',
+                    submitted: false,
+                    errors: {}
+                },
+                nutrition: {
+                    selectedMeal: 'breakfast',
+                    selectedDiet: 'balanced'
+                },
+                testimonials: [
+                    { name: 'Sarah J.', text: 'FitMeUp transformed my approach to fitness. I\'ve lost 15 pounds and feel amazing!', image: '/image/blog1.webp' },
+                    { name: 'Mike T.', text: 'The nutrition plans are easy to follow and the workout programs are effective. Highly recommend!', image: '/api/placeholder/50/50' },
+                    { name: 'Lisa K.', text: 'As a busy mom, I love how FitMeUp makes fitness fit into my schedule. The app is intuitive and helpful.', image: '/api/placeholder/50/50' }
+                ],
+                blogs: [
+                    { 
+                        title: 'How to Start a Fitness Journey That Lasts', 
+                        excerpt: 'Building sustainable habits is key to long-term fitness success. Learn how to create a routine that sticks.',
+                        image: '/api/placeholder/400/250',
+                        date: 'April 2, 2025'
+                    },
+                    { 
+                        title: 'Nutrition Myths Debunked by Science', 
+                        excerpt: 'We separate fact from fiction when it comes to popular nutrition claims and provide evidence-based guidance.',
+                        image: '/api/placeholder/400/250',
+                        date: 'March 28, 2025'
+                    },
+                    { 
+                        title: '5 Essential Exercises Everyone Should Master', 
+                        excerpt: 'These fundamental movements form the basis of an effective fitness routine regardless of your goals.',
+                        image: '/api/placeholder/400/250',
+                        date: 'March 20, 2025'
+                    }
+                ],
+                calculateBMI() {
+                    const heightInM = this.bmiData.height / 100;
+                    const bmi = this.bmiData.weight / (heightInM * heightInM);
+                    return bmi.toFixed(1);
+                },
+                getBMICategory() {
+                    const bmi = this.calculateBMI();
+                    if (bmi < 18.5) return { category: 'Underweight', color: 'text-blue-500' };
+                    if (bmi < 25) return { category: 'Normal weight', color: 'text-green-500' };
+                    if (bmi < 30) return { category: 'Overweight', color: 'text-yellow-500' };
+                    return { category: 'Obese', color: 'text-red-500' };
+                },
+                calculateTDEE() {
+                    let bmr = 0;
+                    if (this.bmiData.gender === 'male') {
+                        bmr = 10 * this.bmiData.weight + 6.25 * this.bmiData.height - 5 * this.bmiData.age + 5;
+                    } else {
+                        bmr = 10 * this.bmiData.weight + 6.25 * this.bmiData.height - 5 * this.bmiData.age - 161;
+                    }
+        
+                    const activityMultipliers = {
+                        'sedentary': 1.2,
+                        'light': 1.375,
+                        'moderate': 1.55,
+                        'active': 1.725,
+                        'very-active': 1.9
+                    };
+        
+                    return Math.round(bmr * activityMultipliers[this.bmiData.activityLevel]);
+                },
+                validateEmail(email) {
+                    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    return re.test(email);
+                },
+                submitForm() {
+                    this.contactForm.errors = {};
+        
+                    if (!this.contactForm.name) this.contactForm.errors.name = 'Name is required';
+                    if (!this.contactForm.email) this.contactForm.errors.email = 'Email is required';
+                    else if (!this.validateEmail(this.contactForm.email)) this.contactForm.errors.email = 'Invalid email';
+                    if (!this.contactForm.message) this.contactForm.errors.message = 'Message is required';
+        
+                    if (Object.keys(this.contactForm.errors).length === 0) {
+                        fetch('http://localhost:5000/api/contact', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: this.contactForm.name,
+                                email: this.contactForm.email,
+                                message: this.contactForm.message
+                            })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                this.contactForm.submitted = true;
+                                this.contactForm.name = '';
+                                this.contactForm.email = '';
+                                this.contactForm.message = '';
+                            }
+                        })
+                        .catch(err => console.error(err));
+                    }
+                },
+                initializeCharts() {
+                    if (this.currentPage === 'calculator') {
+                        setTimeout(() => {
+                            const macroCtx = document.getElementById('macroChart')?.getContext('2d');
+                            if (macroCtx) {
+                                new Chart(macroCtx, {
+                                    type: 'doughnut',
+                                    data: {
+                                        labels: ['Protein', 'Carbs', 'Fat'],
+                                        datasets: [{
+                                            data: [30, 40, 30],
+                                            backgroundColor: ['#4F46E5', '#7C3AED', '#EC4899']
+                                        }]
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        plugins: {
+                                            legend: {
+                                                position: 'bottom'
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        }, 100);
+                    }
+                }
+            }
+        }
+        </script>
+        <script>
+            const form = document.getElementById("contactform");
+            const status = document.getElementById("status-msg");
+          
+            form.addEventListener("submit", function (e) {
+              e.preventDefault();
+          
+              const data = {
+                name: form.name.value,
+                email: form.email.value,
+                message: form.message.value
+              };
+          
+              fetch("http://localhost:5000/api/contact", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
+              })
+              .then(response => response.json())
+              .then(json => {
+                if (json.success) {
+                  status.innerText = "✅ Message sent!";
+                  form.reset();
+                } else {
+                  status.innerText = "❌ " + (json.error || "Something went wrong.");
+                }
+              })
+              .catch(err => {
+                console.error("Request error:", err);
+                status.innerText = "❌ Server error. Check backend.";
+              });
+            });
+        </script>
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md fixed w-full z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <h1 class="text-xl font-bold text-indigo-600">FitMeeUp</h1>
+                    </div>
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <button @click="currentPage = 'home'" class="px-3 py-2 text-sm font-medium" :class="currentPage === 'home' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'">Home</button>
+                        <button @click="currentPage = 'nutrition'" class="px-3 py-2 text-sm font-medium" :class="currentPage === 'nutrition' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'">Nutrition</button>
+                        <button @click="currentPage = 'calculator'" class="px-3 py-2 text-sm font-medium" :class="currentPage === 'calculator' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'">Calculator</button>
+                        <button @click="currentPage = 'blog'" class="px-3 py-2 text-sm font-medium" :class="currentPage === 'blog' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'">Blog</button>
+                        <button @click="currentPage = 'contact'" class="px-3 py-2 text-sm font-medium" :class="currentPage === 'contact' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'">Contact</button>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium hidden md:block">Sign Up Free</button>
+                    <div class="-mr-2 flex items-center sm:hidden">
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+                            <span class="sr-only">Open main menu</span>
+                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile menu -->
+        <div x-show="mobileMenuOpen" class="sm:hidden bg-white border-t border-gray-200" x-cloak>
+            <div class="pt-2 pb-3 space-y-1">
+                <button @click="currentPage = 'home'; mobileMenuOpen = false" class="block pl-3 pr-4 py-2 text-base font-medium w-full text-left" :class="currentPage === 'home' ? 'text-indigo-600 border-l-4 border-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">Home</button>
+                <button @click="currentPage = 'nutrition'; mobileMenuOpen = false" class="block pl-3 pr-4 py-2 text-base font-medium w-full text-left" :class="currentPage === 'nutrition' ? 'text-indigo-600 border-l-4 border-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">Nutrition</button>
+                <button @click="currentPage = 'calculator'; mobileMenuOpen = false" class="block pl-3 pr-4 py-2 text-base font-medium w-full text-left" :class="currentPage === 'calculator' ? 'text-indigo-600 border-l-4 border-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">Calculator</button>
+                <button @click="currentPage = 'blog'; mobileMenuOpen = false" class="block pl-3 pr-4 py-2 text-base font-medium w-full text-left" :class="currentPage === 'blog' ? 'text-indigo-600 border-l-4 border-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">Blog</button>
+                <button @click="currentPage = 'contact'; mobileMenuOpen = false" class="block pl-3 pr-4 py-2 text-base font-medium w-full text-left" :class="currentPage === 'contact' ? 'text-indigo-600 border-l-4 border-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">Contact</button>
+            </div>
+            <div class="pt-4 pb-3 border-t border-gray-200">
+                <div class="flex items-center px-4">
+                    <button class="block w-full bg-indigo-600 text-center hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium">Sign Up Free</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-16">
+        <!-- Home Page -->
+        <div x-show="currentPage === 'home'" class="page-transition" 
+             x-transition:enter="fade-enter" 
+             x-transition:enter-start="fade-enter" 
+             x-transition:enter-end="fade-enter-active">
+            <!-- Hero Section -->
+            <div class="hero-gradient text-white py-16 md:py-24">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="lg:flex lg:items-center lg:justify-between">
+                        <div class="lg:w-1/2">
+                            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight">Your Fitness Journey Starts Here</h1>
+                            <p class="mt-4 text-lg md:text-xl">Personalized workouts, nutrition plans, and progress tracking — all in one place.</p>
+                            <div class="mt-8 flex flex-wrap gap-4">
+                                <button class="bg-white text-indigo-600 hover:bg-gray-100 px-6 py-3 rounded-full font-medium text-lg">Start Free Trial</button>
+                                <button class="border border-white text-white hover:bg-white hover:bg-opacity-10 px-6 py-3 rounded-full font-medium text-lg">Learn More</button>
+                            </div>
+                        </div>
+                        <div class="mt-10 lg:mt-0 lg:w-1/2 flex justify-center">
+                            <img src="/image/exercise_motivation.jpg" alt="Fitness app interface" class="w-13 h-13 rounded-lg shadow-xl">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Features Section -->
+            <div class="py-16 bg-white">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center">
+                        <h2 class="text-3xl font-extrabold text-gray-900">Why Choose FitMeUp?</h2>
+                        <p class="mt-4 text-lg text-gray-600">Everything you need to reach your fitness goals — from workouts to nutrition.</p>
+                    </div>
+                    
+                    <div class="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                        <div class="bg-gray-50 rounded-xl p-8 shadow-md card-hover">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-dumbbell text-indigo-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-4 text-xl font-medium text-gray-900">Personalized Workouts</h3>
+                            <p class="mt-2 text-gray-600">Custom exercise plans tailored to your fitness level and goals.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-xl p-8 shadow-md card-hover">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-utensils text-indigo-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-4 text-xl font-medium text-gray-900">Nutrition Planning</h3>
+                            <p class="mt-2 text-gray-600">Meal plans and recipes tailored to your dietary needs and preferences.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-xl p-8 shadow-md card-hover">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-chart-line text-indigo-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-4 text-xl font-medium text-gray-900">Progress Tracking</h3>
+                            <p class="mt-2 text-gray-600">Track your workouts, measurements, and achievements over time.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-xl p-8 shadow-md card-hover">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-users text-indigo-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-4 text-xl font-medium text-gray-900">Community Support</h3>
+                            <p class="mt-2 text-gray-600">Connect with like-minded fitness enthusiasts for motivation and tips.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-xl p-8 shadow-md card-hover">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-mobile-alt text-indigo-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-4 text-xl font-medium text-gray-900">Mobile App</h3>
+                            <p class="mt-2 text-gray-600">Access your workout and nutrition plans on the go with our mobile app.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-xl p-8 shadow-md card-hover">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-graduation-cap text-indigo-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-4 text-xl font-medium text-gray-900">Educational Resources</h3>
+                            <p class="mt-2 text-gray-600">Articles, videos, and guides to help you make informed fitness decisions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Testimonials Section -->
+            <div class="py-16 bg-gray-50">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center">
+                        <h2 class="text-3xl font-extrabold text-gray-900">What Our Users Say</h2>
+                        <p class="mt-4 text-lg text-gray-600">Join thousands of satisfied users who have transformed their fitness journey.</p>
+                    </div>
+                    
+                    <div class="mt-16 grid gap-8 md:grid-cols-3">
+                        <template x-for="testimonial in testimonials">
+                            <div class="bg-white rounded-xl p-8 shadow-md">
+                                <div class="flex items-center">
+                                    <img :src="testimonial.image" alt="User" class="w-12 h-12 rounded-full">
+                                    <div class="ml-4">
+                                        <h4 class="text-lg font-medium text-gray-900" x-text="testimonial.name"></h4>
+                                        <div class="flex text-yellow-400 mt-1">
+                                            <i class="fas fa-star"></i>
+                                            <i class="fas fa-star"></i>
+                                            <i class="fas fa-star"></i>
+                                            <i class="fas fa-star"></i>
+                                            <i class="fas fa-star"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="mt-4 text-gray-600" x-text="testimonial.text"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CTA Section -->
+            <div class="bg-indigo-600 py-16">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center">
+                        <h2 class="text-3xl font-extrabold text-white">Ready to Transform Your Fitness?</h2>
+                        <p class="mt-4 text-xl text-indigo-100">Get started with FitMeUp today and take the first step towards a healthier you.</p>
+                        <div class="mt-8">
+                            <button class="bg-white text-indigo-600 hover:bg-gray-100 px-8 py-4 rounded-full font-medium text-lg">Start Your Free Trial</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Nutrition Page -->
+        <div x-show="currentPage === 'nutrition'" class="page-transition" 
+             x-transition:enter="fade-enter" 
+             x-transition:enter-start="fade-enter" 
+             x-transition:enter-end="fade-enter-active">
+            <div class="bg-gradient-to-r from-green-500 to-teal-500 text-white py-16">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center">
+                        <h1 class="text-4xl font-extrabold tracking-tight sm:text-5xl">Nutrition Plans</h1>
+                        <p class="mt-4 text-xl">Fuel your body right with personalized meal planning and nutritional guidance.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Diet Type Selection -->
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Choose Your Diet Type</h2>
+                
+                <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    <div @click="nutrition.selectedDiet = 'balanced'" class="p-6 rounded-xl shadow-md cursor-pointer card-hover" :class="nutrition.selectedDiet === 'balanced' ? 'bg-green-50 border-2 border-green-500' : 'bg-white'">
+                        <div class="flex justify-center mb-4">
+                            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-balance-scale text-green-500 text-2xl"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-xl font-medium text-center text-gray-900">Balanced</h3>
+                        <p class="mt-2 text-gray-600 text-center">A well-rounded diet with healthy portions of all macronutrients.</p>
+                    </div>
+                    
+                    <div @click="nutrition.selectedDiet = 'high-protein'" class="p-6 rounded-xl shadow-md cursor-pointer card-hover" :class="nutrition.selectedDiet === 'high-protein' ? 'bg-green-50 border-2 border-green-500' : 'bg-white'">
+                        <div class="flex justify-center mb-4">
+                            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-drumstick-bite text-green-500 text-2xl"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-xl font-medium text-center text-gray-900">High Protein</h3>
+                        <p class="mt-2 text-gray-600 text-center">Focuses on protein-rich foods for muscle building and recovery.</p>
+                    </div>
+                    
+                    <div @click="nutrition.selectedDiet = 'vegetarian'" class="p-6 rounded-xl shadow-md cursor-pointer card-hover" :class="nutrition.selectedDiet === 'vegetarian' ? 'bg-green-50 border-2 border-green-500' : 'bg-white'">
+                        <div class="flex justify-center mb-4">
+                            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-leaf text-green-500 text-2xl"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-xl font-medium text-center text-gray-900">Vegetarian</h3>
+                        <p class="mt-2 text-gray-600 text-center">Plant-based meals without meat but includes dairy and eggs.</p>
+                    </div>
+                    
+                    <div @click="nutrition.selectedDiet = 'keto'" class="p-6 rounded-xl shadow-md cursor-pointer card-hover" :class="nutrition.selectedDiet === 'keto' ? 'bg-green-50 border-2 border-green-500' : 'bg-white'">
+                        <div class="flex justify-center mb-4">
+                            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-cheese text-green-500 text-2xl"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-xl font-medium text-center text-gray-900">Keto</h3>
+                        <p class="mt-2 text-gray-600 text-center">Low-carb, high-fat diet designed to put your body in ketosis.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Meal Types -->
+            <div class="bg-gray-50 py-12">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Browse Meal Ideas</h2>
+                    
+                    <div class="flex flex-wrap gap-4 mb-8">
+                        <button @click="nutrition.selectedMeal = 'breakfast'" class="px-6 py-2 rounded-full text-sm font-medium" :class="nutrition.selectedMeal === 'breakfast' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'">Breakfast</button>
+                        <button @click="nutrition.selectedMeal = 'lunch'" class="px-6 py-2 rounded-full text-sm font-medium" :class="nutrition.selectedMeal === 'lunch' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'">Lunch</button>
+                        <button @click="nutrition.selectedMeal = 'dinner'" class="px-6 py-2 rounded-full text-sm font-medium" :class="nutrition.selectedMeal === 'dinner' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'">Dinner</button>
+                        <button @click="nutrition.selectedMeal = 'snacks'" class="px-6 py-2 rounded-full text-sm font-medium" :class="nutrition.selectedMeal === 'snacks' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'">Snacks</button>
+                    </div>
+                    
+                    <!-- Breakfast Meals -->
+                    <div x-show="nutrition.selectedMeal === 'breakfast'" class="space-y-8">
+                        <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
+                            <!-- Paste the calculator content here -->
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+            
+
+        <!-- Calculator Page -->
+        <div x-show="currentPage === 'calculator'" class="page-transition" 
+                x-transition:enter="fade-enter" 
+                x-transition:enter-start="fade-enter" 
+                x-transition:enter-end="fade-enter-active">
+            <!-- Header Section -->
+            <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-16">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <div class="text-center">
+                    <h1 class="text-4xl font-extrabold tracking-tight sm:text-5xl">Fitness Calculator</h1>
+                    <p class="mt-4 text-xl">Calculate your BMI, daily calorie needs, and macronutrient breakdown.</p>
+                </div>
+                </div>
+            </div>
+
+            <!-- Calculator Content -->
+            <div class="w-full px-4 sm:px-6 lg:px-8 py-12">
+                <!-- Paste full calculator component from breakfast here -->
+                
+
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                    <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+                        <div class="grid md:grid-cols-2 gap-8">
+                            <!-- Input Form -->
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-900 mb-6">Your Details</h2>
+                                
+                                <!-- Gender Selection -->
+                                <div class="mb-6">
+                                    <label class="block text-gray-700 font-medium mb-2">Gender</label>
+                                    <div class="flex space-x-4">
+                                        <div class="flex items-center">
+                                            <input type="radio" id="male" name="gender" value="male" x-model="bmiData.gender" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                                            <label for="male" class="ml-2 text-gray-700">Male</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input type="radio" id="female" name="gender" value="female" x-model="bmiData.gender" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                                            <label for="female" class="ml-2 text-gray-700">Female</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Age Input -->
+                                <div class="mb-6">
+                                    <label for="age" class="block text-gray-700 font-medium mb-2">Age</label>
+                                    <div class="flex items-center">
+                                        <input type="range" id="age" min="18" max="80" step="1" x-model="bmiData.age" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                                        <span class="ml-4 w-12 text-center font-medium" x-text="bmiData.age"></span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Height Input -->
+                                <div class="mb-6">
+                                    <label for="height" class="block text-gray-700 font-medium mb-2">Height (cm)</label>
+                                    <div class="flex items-center">
+                                        <input type="range" id="height" min="140" max="220" step="1" x-model="bmiData.height" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                                        <span class="ml-4 w-12 text-center font-medium" x-text="bmiData.height"></span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Weight Input -->
+                                <div class="mb-6">
+                                    <label for="weight" class="block text-gray-700 font-medium mb-2">Weight (kg)</label>
+                                    <div class="flex items-center">
+                                        <input type="range" id="weight" min="40" max="150" step="1" x-model="bmiData.weight" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                                        <span class="ml-4 w-12 text-center font-medium" x-text="bmiData.weight"></span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Activity Level -->
+                                <div class="mb-6">
+                                    <label for="activity" class="block text-gray-700 font-medium mb-2">Activity Level</label>
+                                    <select id="activity" x-model="bmiData.activityLevel" class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="sedentary">Sedentary (little to no exercise)</option>
+                                        <option value="light">Light (exercise 1-3 days/week)</option>
+                                        <option value="moderate">Moderate (exercise 3-5 days/week)</option>
+                                        <option value="active">Active (exercise 6-7 days/week)</option>
+                                        <option value="very-active">Very Active (hard exercise daily)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Results Panel -->
+                            <div class="bg-gray-50 rounded-xl p-6">
+                                <h2 class="text-2xl font-bold text-gray-900 mb-6">Your Results</h2>
+                                
+                                <!-- BMI Result -->
+                                <div class="mb-8">
+                                    <h3 class="text-lg font-medium text-gray-700 mb-2">Body Mass Index (BMI)</h3>
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-4xl font-bold" x-text="calculateBMI()"></div>
+                                            <div class="mt-1" :class="getBMICategory().color" x-text="getBMICategory().category"></div>
+                                        </div>
+                                        
+                                        <!-- BMI Chart -->
+                                        <div class="relative w-32 h-32">
+                                            <svg class="w-full h-full" viewBox="0 0 120 120">
+                                                <!-- Underweight section -->
+                                                <path d="M60,60 L60,10 A50,50 0 0,1 85,17.5 Z" fill="#3B82F6" fill-opacity="0.2"></path>
+                                                <!-- Normal weight section -->
+                                                <path d="M60,60 L85,17.5 A50,50 0 0,1 110,60 Z" fill="#10B981" fill-opacity="0.2"></path>
+                                                <!-- Overweight section -->
+                                                <path d="M60,60 L110,60 A50,50 0 0,1 85,102.5 Z" fill="#F59E0B" fill-opacity="0.2"></path>
+                                                <!-- Obese section -->
+                                                <path d="M60,60 L85,102.5 A50,50 0 0,1 35,102.5 Z" fill="#EF4444" fill-opacity="0.2"></path>
+                                                
+                                                <!-- Needle -->
+                                                <g x-data="{
+                                                    get needleRotation() {
+                                                        const bmi = parseFloat(calculateBMI());
+                                                        // Map BMI to degrees
+                                                        if (bmi < 14) return -135;
+                                                        if (bmi > 35) return 135;
+                                                        return ((bmi - 14) * 270 / 21) - 135;
+                                                    }
+                                                }">
+                                                    <line :transform="'rotate(' + needleRotation + ' 60 60)'" x1="60" y1="60" x2="60" y2="25" stroke="#374151" stroke-width="2"></line>
+                                                    <circle cx="60" cy="60" r="5" fill="#374151"></circle>
+                                                </g>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="text-gray-600 mt-4">
+                                        <p>BMI Categories:</p>
+                                        <ul class="mt-2 space-y-1">
+                                            <li class="flex items-center"><span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span> Underweight: Below 18.5</li>
+                                            <li class="flex items-center"><span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span> Normal weight: 18.5 - 24.9</li>
+                                            <li class="flex items-center"><span class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span> Overweight: 25 - 29.9</li>
+                                            <li class="flex items-center"><span class="w-3 h-3 bg-red-500 rounded-full mr-2"></span> Obese: 30 or higher</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <!-- Daily Calories -->
+                                <div>
+                                    <h3 class="text-lg font-medium text-gray-700 mb-2">Daily Calorie Needs</h3>
+                                    <div class="grid grid-cols-2 gap-4 mb-6">
+                                        <div class="bg-white rounded-lg shadow p-4 text-center">
+                                            <div class="text-sm text-gray-600">Maintenance</div>
+                                            <div class="text-2xl font-bold text-gray-900" x-text="calculateTDEE()"></div>
+                                            <div class="text-xs text-gray-500">calories/day</div>
+                                        </div>
+                                        
+                                        <div class="bg-white rounded-lg shadow p-4 text-center">
+                                            <div class="text-sm text-gray-600">Weight Loss</div>
+                                            <div class="text-2xl font-bold text-gray-900" x-text="calculateTDEE() - 500"></div>
+                                            <div class="text-xs text-gray-500">calories/day</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Macro Distribution -->
+                                    <h3 class="text-lg font-medium text-gray-700 mb-4">Recommended Macros</h3>
+                                    <div class="flex items-center space-x-6">
+                                        <div class="w-32 h-32">
+                                            <canvas id="macroChart"></canvas>
+                                        </div>
+                                        
+                                        <div x-data="{
+                                            get macros() {
+                                                return calculateMacros(calculateTDEE());
+                                            }
+                                        }" class="flex-1">
+                                            <div class="grid grid-cols-3 gap-2">
+                                                <div class="text-center">
+                                                    <div class="text-lg font-semibold" x-text="macros.protein + 'g'"></div>
+                                                    <div class="text-xs text-gray-600">Protein</div>
+                                                </div>
+                                                <div class="text-center">
+                                                    <div class="text-lg font-semibold" x-text="macros.carbs + 'g'"></div>
+                                                    <div class="text-xs text-gray-600">Carbs</div>
+                                                </div>
+                                                <div class="text-center">
+                                                    <div class="text-lg font-semibold" x-text="macros.fat + 'g'"></div>
+                                                    <div class="text-xs text-gray-600">Fat</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Disclaimer -->
+                        <div class="mt-8 text-sm text-gray-500">
+                            <p>Disclaimer: This calculator provides estimates based on standard formulas. Individual needs may vary. Please consult with healthcare professionals for personalized advice.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Tips -->
+                    <div class="mt-12 bg-white rounded-xl shadow-lg p-6 md:p-8">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">Tips for Reaching Your Goals</h2>
+                        
+                        <div class="grid md:grid-cols-3 gap-6">
+                            <div class="bg-blue-50 rounded-lg p-6">
+                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                                    <i class="fas fa-weight text-blue-600 text-xl"></i>
+                                </div>
+                                <h3 class="text-xl font-medium text-gray-900 mb-2">Weight Loss</h3>
+                                <ul class="text-gray-600 space-y-2">
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-blue-500 mt-1 mr-2"></i>
+                                        <span>Create a moderate calorie deficit of 500-750 calories per day</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-blue-500 mt-1 mr-2"></i>
+                                        <span>Focus on protein intake to preserve muscle mass</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-blue-500 mt-1 mr-2"></i>
+                                        <span>Include both cardio and strength training in your routine</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div class="bg-green-50 rounded-lg p-6">
+                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                                    <i class="fas fa-dumbbell text-green-600 text-xl"></i>
+                                </div>
+                                <h3 class="text-xl font-medium text-gray-900 mb-2">Muscle Gain</h3>
+                                <ul class="text-gray-600 space-y-2">
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                        <span>Consume a slight calorie surplus of 250-500 calories daily</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                        <span>Aim for 1.6-2.2g of protein per kg of bodyweight</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                        <span>Focus on progressive overload in resistance training</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div class="bg-purple-50 rounded-lg p-6">
+                                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                                    <i class="fas fa-heart text-purple-600 text-xl"></i>
+                                </div>
+                                <h3 class="text-xl font-medium text-gray-900 mb-2">General Health</h3>
+                                <ul class="text-gray-600 space-y-2">
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-purple-500 mt-1 mr-2"></i>
+                                        <span>Stay hydrated with 2-3 liters of water daily</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-purple-500 mt-1 mr-2"></i>
+                                        <span>Aim for 7-9 hours of quality sleep per night</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle text-purple-500 mt-1 mr-2"></i>
+                                        <span>Include a variety of fruits and vegetables for micronutrients</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Blog Page -->
+        <div x-show="currentPage === 'blog'" class="page-transition" 
+            x-transition:enter="fade-enter" 
+            x-transition:enter-start="fade-enter" 
+            x-transition:enter-end="fade-enter-active">
+            
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-16">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center">
+                        <h1 class="text-4xl font-extrabold sm:text-5xl">Fitness Insights & Tips</h1>
+                        <p class="mt-4 text-xl">Read expert-backed articles on training, nutrition, and lifestyle.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blog Grid -->
+            <div class="bg-white py-12">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                        
+                        <!-- Blog 1 -->
+                        <div class="bg-gray-50 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <img src="/image/blog1.webp" alt="Blog 1" class="w-full h-48 object-cover">
+                            <div class="p-6">
+                                <h2 class="text-xl font-bold mb-2 text-gray-900">How to Build Sustainable Workout Habits</h2>
+                                <p class="text-gray-600 text-sm mb-4">Consistency beats intensity. Learn strategies to make your workouts stick long-term.</p>
+                                <span class="text-indigo-600 text-sm font-medium">Read More →</span>
+                            </div>
+                        </div>
+
+                        <!-- Blog 2 -->
+                        <div class="bg-gray-50 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <img src="/image/blog2.webp" alt="Blog 2" class="w-full h-48 object-cover">
+                            <div class="p-6">
+                                <h2 class="text-xl font-bold mb-2 text-gray-900">Protein Myths Debunked</h2>
+                                <p class="text-gray-600 text-sm mb-4">Is too much protein bad? What about plant protein? Get science-based answers here.</p>
+                                <span class="text-indigo-600 text-sm font-medium">Read More →</span>
+                            </div>
+                        </div>
+
+                        <!-- Blog 3 -->
+                        <div class="bg-gray-50 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <img src="/image/blog3.jpg" alt="Blog 3" class="w-full h-48 object-cover">
+                            <div class="p-6">
+                                <h2 class="text-xl font-bold mb-2 text-gray-900">Morning vs Evening Workouts</h2>
+                                <p class="text-gray-600 text-sm mb-4">Which time is actually better for fat loss and muscle gain? Let’s break it down.</p>
+                                <span class="text-indigo-600 text-sm font-medium">Read More →</span>
+                            </div>
+                        </div>
+
+                        <!-- Blog 4 -->
+                        <div class="bg-gray-50 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <img src="/image/blog4.jpg" alt="Blog 4" class="w-full h-48 object-cover">
+                            <div class="p-6">
+                                <h2 class="text-xl font-bold mb-2 text-gray-900">Smart Meal Prepping for Busy People</h2>
+                                <p class="text-gray-600 text-sm mb-4">Save time and eat better with our foolproof weekly meal prep blueprint.</p>
+                                <span class="text-indigo-600 text-sm font-medium">Read More →</span>
+                            </div>
+                        </div>
+
+                        <!-- Blog 5 -->
+                        <div class="bg-gray-50 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <img src="/image/blog5.jpg" alt="Blog 5" class="w-full h-48 object-cover">
+                            <div class="p-6">
+                                <h2 class="text-xl font-bold mb-2 text-gray-900">Top 5 Exercises for Total-Body Strength</h2>
+                                <p class="text-gray-600 text-sm mb-4">Master these compound lifts and watch your strength and physique skyrocket.</p>
+                                <span class="text-indigo-600 text-sm font-medium">Read More →</span>
+                            </div>
+                        </div>
+
+                        <!-- Blog 6 -->
+                        <div class="bg-gray-50 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <img src="/image/blog6.webp" alt="Blog 6" class="w-full h-48 object-cover">
+                            <div class="p-6">
+                                <h2 class="text-xl font-bold mb-2 text-gray-900">Sleep & Recovery: The Fitness Multiplier</h2>
+                                <p class="text-gray-600 text-sm mb-4">Discover why 8 hours of quality sleep may be more important than your workout itself.</p>
+                                <span class="text-indigo-600 text-sm font-medium">Read More →</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Contact Page -->
+        <div x-show="currentPage === 'contact'" class="page-transition" 
+            x-transition:enter="fade-enter" 
+            x-transition:enter-start="fade-enter" 
+            x-transition:enter-end="fade-enter-active">
+
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-16">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                    <h1 class="text-4xl font-extrabold sm:text-5xl">Contact Us</h1>
+                    <p class="mt-4 text-xl">We’d love to hear from you. Reach out for support, feedback, or collaboration!</p>
+                </div>
+            </div>
+
+            <!-- Contact Section -->
+            <div class="bg-white py-12">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 items-start">
+
+                    <!-- Contact Info -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Get in Touch</h2>
+                        <p class="text-gray-600 mb-6">
+                            At <strong>FitMeeUp</strong>, we’re on a mission to make fitness simple, personalized, and effective for everyone. Whether you're a beginner or a pro, we're here to support you with data-driven tools, nutrition guidance, and powerful motivation.
+                        </p>
+
+                        <ul class="space-y-4 text-gray-700">
+                            <li class="flex items-center">
+                                <i class="fas fa-phone text-indigo-600 mr-3"></i>
+                                <span class="font-medium">Phone:</span> <span class="ml-2">+91 6005316210</span>
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-envelope text-indigo-600 mr-3"></i>
+                                <span class="font-medium">Email:</span> <span class="ml-2">support@fitmeup.com</span>
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-map-marker-alt text-indigo-600 mr-3"></i>
+                                <span class="font-medium">Location:</span> <span class="ml-2">New Delhi, India</span>
+                            </li>
+                        </ul>
+
+                        <div class="mt-8">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Office Hours</h3>
+                            <p class="text-gray-600">Monday to Friday, 9:00 AM – 6:00 PM IST</p>
+                        </div>
+                    </div>
+
+                    <!-- Contact Form -->
+                    <div class="bg-gray-50 p-6 rounded-xl shadow-md">
+                        <h2 class="text-xl font-semibold text-gray-900 mb-4">Send Us a Message</h2>
+
+                        <form @submit.prevent="submitForm">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                                    <input type="text" x-model="contactForm.name" class="w-full mt-1 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <p class="text-sm text-red-500" x-text="contactForm.errors.name"></p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                                    <input type="email" x-model="contactForm.email" class="w-full mt-1 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <p class="text-sm text-red-500" x-text="contactForm.errors.email"></p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Message</label>
+                                    <textarea rows="4" x-model="contactForm.message" class="w-full mt-1 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                                    <p class="text-sm text-red-500" x-text="contactForm.errors.message"></p>
+                                </div>
+                                <div>
+                                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-md font-medium">Send Message</button>
+                                </div>
+                            </div>
+
+                            <div x-show="contactForm.submitted" class="mt-4 text-green-600 font-semibold">
+                                Thanks for reaching out! We'll get back to you soon.
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+
+    </main>
+</body>
+</html>
